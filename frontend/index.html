@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="EcoTask — Gestionnaire de tâches sobre et éco-conçu.">
+  <title>EcoTask</title>
+  <!-- Polices auto-hébergées évitées : on utilise une Google Font légère
+       en preconnect + display=swap pour ne pas bloquer le rendu (1 seule famille) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ─── ÉCRAN AUTH ─────────────────────────────────────────────── -->
+<div id="screen-auth" class="screen active">
+  <div class="auth-wrap">
+    <div class="auth-brand">
+      <div class="brand-icon">✦</div>
+      <span class="brand-name">EcoTask</span>
+    </div>
+    <p class="auth-tagline">Gérez moins, vivez mieux.</p>
+
+    <!-- Tabs -->
+    <div class="auth-tabs" role="tablist">
+      <button class="tab active" role="tab" aria-selected="true"
+              aria-controls="panel-login" id="tab-login"
+              onclick="switchTab('login')">Connexion</button>
+      <button class="tab" role="tab" aria-selected="false"
+              aria-controls="panel-register" id="tab-register"
+              onclick="switchTab('register')">Inscription</button>
+    </div>
+
+    <!-- Login -->
+    <div class="auth-panel active" id="panel-login" role="tabpanel" aria-labelledby="tab-login">
+      <div class="field">
+        <label for="login-email">Email</label>
+        <input type="email" id="login-email" autocomplete="email"
+               placeholder="vous@exemple.fr" required>
+      </div>
+      <div class="field">
+        <label for="login-password">Mot de passe</label>
+        <input type="password" id="login-password" autocomplete="current-password"
+               placeholder="••••••••" required>
+      </div>
+      <p class="form-error" id="login-error" role="alert" hidden></p>
+      <button class="btn-primary" onclick="handleLogin()">
+        <span>Se connecter</span>
+      </button>
+    </div>
+
+    <!-- Register -->
+    <div class="auth-panel" id="panel-register" role="tabpanel" aria-labelledby="tab-register">
+      <div class="field">
+        <label for="reg-name">Nom complet</label>
+        <input type="text" id="reg-name" autocomplete="name"
+               placeholder="Marie Dupont" required>
+      </div>
+      <div class="field">
+        <label for="reg-email">Email</label>
+        <input type="email" id="reg-email" autocomplete="email"
+               placeholder="vous@exemple.fr" required>
+      </div>
+      <div class="field">
+        <label for="reg-password">Mot de passe <small>(min. 8 caractères)</small></label>
+        <input type="password" id="reg-password" autocomplete="new-password"
+               placeholder="••••••••" required>
+      </div>
+      <p class="form-error" id="reg-error" role="alert" hidden></p>
+      <button class="btn-primary" onclick="handleRegister()">
+        <span>Créer mon compte</span>
+      </button>
+    </div>
+
+    <p class="eco-note">🌱 Aucun cookie tiers · Aucun tracker · 0,03 g CO₂/visite</p>
+  </div>
+</div>
+
+<!-- ─── ÉCRAN APP ──────────────────────────────────────────────── -->
+<div id="screen-app" class="screen">
+
+  <!-- Navbar -->
+  <nav>
+    <a href="#" class="logo" aria-label="EcoTask — accueil">
+      <div class="logo-icon">✦</div>
+      EcoTask
+    </a>
+    <div class="nav-center">
+      <span id="nav-greeting" class="nav-greeting"></span>
+    </div>
+    <div class="nav-actions">
+      <div class="eco-pill" id="eco-pill" title="Votre score éco moyen">
+        🌿 <span id="eco-score-val">—</span>
+      </div>
+      <button class="btn-icon" id="theme-toggle" title="Basculer mode sombre"
+              onclick="toggleDark()" aria-label="Basculer mode sombre">◑</button>
+      <button class="btn-ghost" onclick="handleLogout()">Déconnexion</button>
+    </div>
+  </nav>
+
+  <main>
+
+    <!-- Barre d'outils + filtres -->
+    <div class="toolbar">
+      <div class="filters">
+        <select id="filter-status" aria-label="Filtrer par statut" onchange="loadTasks(1)">
+          <option value="">Tous les statuts</option>
+          <option value="todo">À faire</option>
+          <option value="in_progress">En cours</option>
+          <option value="done">Terminé</option>
+        </select>
+        <select id="filter-priority" aria-label="Filtrer par priorité" onchange="loadTasks(1)">
+          <option value="">Toutes priorités</option>
+          <option value="high">Haute</option>
+          <option value="medium">Moyenne</option>
+          <option value="low">Basse</option>
+        </select>
+        <input type="text" id="filter-category" placeholder="Catégorie…"
+               aria-label="Filtrer par catégorie"
+               oninput="debounce(loadTasks, 400)(1)">
+      </div>
+      <button class="btn-primary" onclick="openModal('create')">
+        + Nouvelle tâche
+      </button>
+    </div>
+
+    <!-- Stats éco -->
+    <div class="stats-bar" id="stats-bar" aria-live="polite"></div>
+
+    <!-- Liste des tâches -->
+    <section aria-label="Liste des tâches">
+      <div id="tasks-list" aria-live="polite">
+        <p class="empty-state">Chargement…</p>
+      </div>
+      <!-- Pagination -->
+      <div class="pagination" id="pagination" aria-label="Navigation des pages"></div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ─── MODAL TÂCHE ────────────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-overlay" role="dialog"
+     aria-modal="true" aria-labelledby="modal-title" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-title">Nouvelle tâche</h2>
+      <button class="btn-icon" onclick="closeModal()"
+              aria-label="Fermer">✕</button>
+    </div>
+
+    <div class="field">
+      <label for="task-title">Titre <span aria-hidden="true">*</span></label>
+      <input type="text" id="task-title" maxlength="120"
+             placeholder="Ex. : Optimiser les images du site" required>
+    </div>
+    <div class="field">
+      <label for="task-desc">Description</label>
+      <textarea id="task-desc" rows="3"
+                placeholder="Détails optionnels…"></textarea>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="task-status">Statut</label>
+        <select id="task-status">
+          <option value="todo">À faire</option>
+          <option value="in_progress">En cours</option>
+          <option value="done">Terminé</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="task-priority">Priorité</label>
+        <select id="task-priority">
+          <option value="low">Basse</option>
+          <option value="medium" selected>Moyenne</option>
+          <option value="high">Haute</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="task-category">Catégorie</label>
+        <input type="text" id="task-category" maxlength="50"
+               placeholder="ex : dev, eco, perso">
+      </div>
+      <div class="field">
+        <label for="task-due">Échéance</label>
+        <input type="date" id="task-due">
+      </div>
+    </div>
+
+    <p class="form-error" id="task-error" role="alert" hidden></p>
+
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Annuler</button>
+      <button class="btn-primary" id="modal-submit" onclick="submitTask()">
+        Créer la tâche
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MODAL CONFIRM SUPPRESSION ─────────────────────────────── -->
+<div class="modal-overlay" id="confirm-overlay" role="alertdialog"
+     aria-modal="true" aria-labelledby="confirm-title" hidden>
+  <div class="modal modal--sm">
+    <h2 id="confirm-title" class="modal-title">Supprimer cette tâche ?</h2>
+    <p class="modal-body-text">Cette action est irréversible.</p>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeConfirm()">Annuler</button>
+      <button class="btn-danger" id="confirm-ok">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "name": "ecotask",
+  "version": "1.0.0",
+  "description": "Gestionnaire de tâches éco-conçu — TI616 EFREI",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "node --watch backend/server.js",
+    "db:reset": "rm -f ecotask.db && node -e \"require('./backend/db').initDB()\""
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.18.3",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

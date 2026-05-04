@@ -1,0 +1,13 @@
+{
+  "users": [
+    {
+      "id": 1777909882494,
+      "email": "marie@gmail.com",
+      "password": "$2a$12$SU6eOQq5tKiY5ldr4N8kvOpe6I7mAFsZJekdI.p/O0zmJOo6cV.XS",
+      "name": "marie dupont",
+      "role": "user",
+      "created_at": "2026-05-04T15:51:22.020Z"
+    }
+  ],
+  "tasks": []
+}
