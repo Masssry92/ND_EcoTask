@@ -735,10 +735,10 @@ main {
 .dash-stat span  { font-family: var(--font-serif); font-size: 1.4rem; color: var(--bark); }
 .dash-stat small { font-size: 0.62rem; color: var(--stone); }
 
-/* Panneaux */
+/* Panneaux — 2×2 */
 .dash-panels {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 0.9rem;
 }
 
@@ -960,11 +960,12 @@ main {
   letter-spacing: 0.02em;
 }
 
-/* ─── GRAPHE MENSUEL ─────────────────────────────────────────────── */
+/* ─── GRAPHE MENSUEL / CARTE ─────────────────────────────────────── */
 .dash-monthly {
   border-top: 1px solid var(--border);
   padding-top: 0.65rem;
   margin-top: 0.25rem;
+  grid-column: 1 / -1; /* toujours pleine largeur */
 }
 
 .monthly-bars {
@@ -1017,4 +1018,202 @@ main {
     var(--leaf) 0deg calc(var(--eco-pct) * 3.6deg),
     #2a3428     calc(var(--eco-pct) * 3.6deg) 360deg
   );
+}
+
+/* ══════════════════════════════════════════════════════════════════ */
+/* ═══ FEATURES INNOVANTES                                       ═══ */
+/* ══════════════════════════════════════════════════════════════════ */
+
+/* ─── CLASSEMENT HEBDO ───────────────────────────────────────────── */
+.lb-week-label {
+  font-size: 0.6rem;
+  color: var(--stone);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.35rem;
+}
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.22rem 0.25rem;
+  border-radius: 4px;
+  font-size: 0.69rem;
+  border-bottom: 1px solid var(--border);
+}
+.lb-row:last-child { border-bottom: none; }
+.lb-me { background: var(--mist); font-weight: 500; }
+.lb-rank  { width: 22px; font-size: 0.78rem; flex-shrink: 0; }
+.lb-name  { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-trees { font-size: 0.58rem; flex-shrink: 0; }
+.lb-co2   { font-size: 0.58rem; color: var(--stone); flex-shrink: 0; width: 34px; text-align: right; }
+.lb-trend { font-size: 0.65rem; width: 22px; text-align: right; flex-shrink: 0; }
+.trend-up { color: var(--sage); }
+.trend-dn { color: var(--red); }
+.trend-eq { color: var(--stone); }
+.lb-meta  { font-size: 0.58rem; color: var(--stone); margin-top: 0.35rem; }
+
+/* ─── DÉFIS DU JOUR ──────────────────────────────────────────────── */
+.challenge { margin-bottom: 0.5rem; }
+.ch-done .ch-desc { text-decoration: line-through; color: var(--stone); }
+.ch-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.3rem;
+  font-size: 0.68rem;
+  margin-bottom: 0.18rem;
+  line-height: 1.3;
+}
+.ch-emoji { flex-shrink: 0; }
+.ch-desc  { flex: 1; }
+.ch-pts   { font-size: 0.58rem; color: var(--stone); flex-shrink: 0; white-space: nowrap; }
+.pts-earned { color: var(--sage); font-weight: 600; }
+.ch-bar-track {
+  height: 5px;
+  background: var(--mist);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 0.1rem;
+}
+.ch-bar-fill {
+  height: 100%;
+  background: var(--leaf);
+  border-radius: 3px;
+  transition: width 0.7s cubic-bezier(.4,0,.2,1);
+}
+.ch-foot { font-size: 0.58rem; color: var(--stone); }
+.challenges-score {
+  font-size: 0.7rem;
+  color: var(--moss);
+  font-weight: 500;
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--border);
+}
+
+/* ─── CARTE MONDIALE ─────────────────────────────────────────────── */
+#world-map {
+  height: 280px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.world-map-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.62rem;
+  color: var(--stone);
+  margin-top: 0.4rem;
+  flex-wrap: wrap;
+}
+.legend-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 2px;
+  vertical-align: middle;
+}
+.world-map-count { margin-left: auto; color: var(--moss); font-weight: 500; }
+
+/* Pins Leaflet */
+.map-pin {
+  border: 2px solid rgba(255,255,255,0.8);
+  box-shadow: 0 1px 5px rgba(0,0,0,.35);
+  animation: pinPulse 3s ease-in-out infinite;
+}
+.map-pin-me {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(200,168,64,.35), 0 1px 6px rgba(0,0,0,.4) !important;
+  animation: pinPulse 1.5s ease-in-out infinite !important;
+}
+@keyframes pinPulse {
+  0%, 100% { transform: scale(1);    opacity: 1;    }
+  50%       { transform: scale(1.25); opacity: 0.8; }
+}
+
+/* Popup Leaflet personnalisée */
+.eco-popup .leaflet-popup-content-wrapper {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  border-radius: var(--radius);
+  background: var(--white);
+  color: var(--bark);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  padding: 0;
+}
+.eco-popup .leaflet-popup-content { margin: 0.5rem 0.65rem; }
+.eco-popup .leaflet-popup-tip { background: var(--white); }
+
+/* ─── MODE MILITANT ──────────────────────────────────────────────── */
+.btn-militant {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 0.28rem 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--stone);
+  cursor: pointer;
+  transition: all var(--trans);
+  letter-spacing: 0.04em;
+}
+.btn-militant:hover { border-color: var(--sage); color: var(--moss); }
+.btn-militant.militant-active { background: var(--moss); border-color: var(--moss); color: var(--mist); }
+
+/* Bannière notification */
+.militant-banner {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  background: var(--moss);
+  color: var(--mist);
+  border-radius: var(--radius);
+  padding: 0.85rem 1.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  line-height: 1.65;
+  z-index: 2000;
+  box-shadow: 0 4px 20px rgba(45,74,45,.4);
+  animation: bannerIn 0.35s cubic-bezier(.4,0,.2,1);
+  max-width: 280px;
+}
+.militant-badge {
+  margin-top: 0.3rem;
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+@keyframes bannerIn {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* Le "mode militant" lui-même */
+body.militant {
+  filter: grayscale(1) contrast(1.05);
+}
+body.militant * {
+  font-family: 'Courier New', Courier, monospace !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  border-radius: 0 !important;
+  animation: none !important;
+}
+body.militant nav {
+  border-bottom: 2px solid #333 !important;
+}
+body.militant .eco-dashboard,
+body.militant .task-card,
+body.militant .modal {
+  border: 1px solid #333 !important;
+}
+body.militant .btn-primary,
+body.militant .btn-ghost,
+body.militant .btn-icon { border-radius: 0 !important; }
+
+/* Indicateur de poids page (affiché quand militant) */
+body.militant .eco-note::after {
+  content: ' · Mode Militant : −97% CO₂';
+  font-weight: 600;
 }

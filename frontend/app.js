@@ -168,6 +168,7 @@ function enterApp() {
   showScreen('app');
   loadDashboard();
   loadTasks(1);
+  setTimeout(initWorldMap, 200); // Leaflet a besoin que le DOM soit visible
 }
 
 /* ─── Dashboard éco ──────────────────────────────────────────────── */
@@ -195,12 +196,6 @@ async function loadDashboard() {
     $id('dash-total').textContent = d.total;
     $id('dash-done').textContent  = d.done;
 
-    // Suggestions
-    const sEl = $id('suggestions-list');
-    sEl.innerHTML = (d.suggestions || []).map(s =>
-      `<div class="suggestion"><span class="sug-icon">${s.icon}</span><span>${s.text}</span></div>`
-    ).join('') || '<p class="empty-state" style="font-size:.75rem">Ajoutez des tâches.</p>';
-
     // Graphique catégories
     const cEl = $id('categories-chart');
     if (d.byCategory && d.byCategory.length) {
@@ -220,16 +215,193 @@ async function loadDashboard() {
       cEl.innerHTML = '<p class="empty-state" style="font-size:.75rem">Aucune donnée.</p>';
     }
 
-    // Stocker pour le slider
     state.dashData = d;
-
-    // Slider planète + graphe mensuel
-    updateImpactSlider(Number($id('impact-slider').value) || 0);
-    renderMonthlyChart(d.monthlyActivity || []);
+    renderChallenges(d);
+    renderLeaderboard(d);
+    updateImpactSlider(Number($id('impact-slider')?.value) || 0);
   } catch (e) { console.warn('[dashboard]', e.message); }
 }
 
-/* ─── Slider planète interactif ──────────────────────────────────── */
+/* ─── ═══════════════════════════════════════════════════════════════ */
+/* ─── FEATURES INNOVANTES                                            */
+/* ─── ═══════════════════════════════════════════════════════════════ */
+
+/* ─── 1. DÉFIS QUOTIDIENS ────────────────────────────────────────── */
+function renderChallenges(d) {
+  const today = new Date().toISOString().slice(0, 10);
+  const todayCount = (d.monthlyActivity || []).find(a => a.date === today)?.count || 0;
+  const ecoCategories = (d.byCategory || []).filter(c => c.category !== 'general').length;
+
+  const challenges = [
+    { emoji: '🌱', desc: 'Créer 3 tâches éco aujourd\'hui', pts: 15, prog: Math.min(todayCount, 3), total: 3 },
+    { emoji: '✅', desc: 'Terminer 2 tâches (total)',        pts: 10, prog: Math.min(d.done || 0, 2), total: 2 },
+    { emoji: '🏷️', desc: 'Utiliser 3 catégories éco',        pts: 20, prog: Math.min(ecoCategories, 3), total: 3 },
+  ];
+
+  const earned = challenges.reduce((s, c) => s + (c.prog >= c.total ? c.pts : 0), 0);
+  const rank   = earned >= 35 ? '🏆 Gold' : earned >= 15 ? '🥈 Silver' : '🌱 Rookie';
+
+  $id('challenges-list').innerHTML = challenges.map(c => {
+    const done = c.prog >= c.total;
+    const pct  = Math.round(c.prog / c.total * 100);
+    return `
+      <div class="challenge ${done ? 'ch-done' : ''}">
+        <div class="ch-header">
+          <span class="ch-emoji">${c.emoji}</span>
+          <span class="ch-desc">${c.desc}</span>
+          <span class="ch-pts ${done ? 'pts-earned' : ''}">+${c.pts}pts</span>
+        </div>
+        <div class="ch-bar-track"><div class="ch-bar-fill" style="width:${pct}%"></div></div>
+        <div class="ch-foot">${done ? '✅ Complété !' : c.prog + '/' + c.total}</div>
+      </div>`;
+  }).join('');
+
+  $id('challenges-score').innerHTML = `${earned} pts · ${rank}`;
+}
+
+/* ─── 2. CLASSEMENT HEBDOMADAIRE ─────────────────────────────────── */
+function renderLeaderboard(d) {
+  const avg      = d.avgEco || 0;
+  const userName = (state.user?.name || 'Vous').split(' ')[0];
+  const week     = weekOfYear(new Date());
+
+  const peers = [
+    { name: 'Sophie M.', score: 82, trend: +3 },
+    { name: 'Marc L.',   score: 71, trend:  0 },
+    { name: 'Julie K.',  score: 66, trend: +2 },
+    { name: 'Alex D.',   score: 58, trend: -2 },
+    { name: 'Emma R.',   score: 45, trend: +1 },
+  ];
+
+  const all = [...peers, { name: userName, score: avg, trend: 0, isUser: true }]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 6);
+
+  const medals = ['🥇', '🥈', '🥉', '4.', '5.', '6.'];
+
+  $id('leaderboard-week').textContent = `Semaine ${week}`;
+  $id('leaderboard-list').innerHTML = all.map((p, i) => {
+    const trees = Math.max(0, Math.floor(p.score / 20));
+    const treeStr = '🌳'.repeat(Math.min(trees, 4)) || '🌱';
+    const co2   = ((100 - p.score) * 0.001 + 0.005).toFixed(3);
+    const trendCls = p.trend > 0 ? 'trend-up' : p.trend < 0 ? 'trend-dn' : 'trend-eq';
+    const trendTxt = p.trend > 0 ? '↑' + p.trend : p.trend < 0 ? '↓' + Math.abs(p.trend) : '→';
+    return `
+      <div class="lb-row ${p.isUser ? 'lb-me' : ''}">
+        <span class="lb-rank">${medals[i]}</span>
+        <span class="lb-name">${p.isUser ? '<strong>' + p.name + '</strong>' : p.name}</span>
+        <span class="lb-trees">${treeStr}</span>
+        <span class="lb-co2">${co2}g</span>
+        <span class="lb-trend ${trendCls}">${trendTxt}</span>
+      </div>`;
+  }).join('');
+
+  $id('leaderboard-meta').textContent = `986 participants · Reset dans ${daysUntilReset()}`;
+}
+
+function weekOfYear(d) {
+  const start = new Date(d.getFullYear(), 0, 1);
+  return Math.ceil(((d - start) / 86400000 + start.getDay() + 1) / 7);
+}
+
+function daysUntilReset() {
+  const day = new Date().getDay(); // 0=Dim, 1=Lun...
+  const left = day === 1 ? 7 : ((8 - day) % 7);
+  return `${left}j ${23 - new Date().getHours()}h`;
+}
+
+/* ─── 3. CARTE MONDIALE (Leaflet) ────────────────────────────────── */
+let worldMap = null;
+
+const WORLD_USERS = [
+  { lat: 48.85, lng:   2.35, city: 'Paris',        eco: 72, isUser: true },
+  { lat: 51.51, lng:  -0.13, city: 'Londres',       eco: 68 },
+  { lat: 52.52, lng:  13.40, city: 'Berlin',        eco: 81 },
+  { lat: 40.42, lng:  -3.70, city: 'Madrid',        eco: 65 },
+  { lat: 41.90, lng:  12.50, city: 'Rome',          eco: 70 },
+  { lat: 50.85, lng:   4.35, city: 'Bruxelles',     eco: 77 },
+  { lat: 55.68, lng:  12.57, city: 'Copenhague',    eco: 89 },
+  { lat: 59.33, lng:  18.07, city: 'Stockholm',     eco: 91 },
+  { lat: 37.98, lng:  23.73, city: 'Athènes',       eco: 58 },
+  { lat: 38.72, lng:  -9.14, city: 'Lisbonne',      eco: 74 },
+  { lat:-33.87, lng: 151.21, city: 'Sydney',        eco: 62 },
+  { lat: 35.68, lng: 139.65, city: 'Tokyo',         eco: 85 },
+  { lat: 37.57, lng: 126.98, city: 'Séoul',         eco: 79 },
+  { lat:-23.55, lng: -46.63, city: 'São Paulo',     eco: 55 },
+  { lat: 40.71, lng: -74.01, city: 'New York',      eco: 48 },
+  { lat: 45.50, lng: -73.57, city: 'Montréal',      eco: 72 },
+  { lat:-34.60, lng: -58.38, city: 'Buenos Aires',  eco: 61 },
+  { lat: 19.43, lng: -99.13, city: 'Mexico City',   eco: 57 },
+  { lat:  6.52, lng:   3.38, city: 'Lagos',         eco: 64 },
+  { lat: 30.04, lng:  31.24, city: 'Le Caire',      eco: 53 },
+  { lat:  1.35, lng: 103.82, city: 'Singapour',     eco: 82 },
+  { lat: 55.76, lng:  37.62, city: 'Moscou',        eco: 44 },
+  { lat: 28.70, lng:  77.10, city: 'Delhi',         eco: 59 },
+  { lat: 39.90, lng: 116.41, city: 'Pékin',         eco: 51 },
+];
+
+function initWorldMap() {
+  if (worldMap) { worldMap.invalidateSize(); return; }
+  const el = $id('world-map');
+  if (!el || !window.L) return;
+
+  try {
+    worldMap = L.map('world-map', {
+      center: [20, 10], zoom: 2,
+      zoomControl: false, scrollWheelZoom: false,
+      attributionControl: false, dragging: false,
+    });
+
+    // Tuiles CartoDB Positron — très légères, sans labels
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
+      { maxZoom: 3 }).addTo(worldMap);
+
+    WORLD_USERS.forEach(u => {
+      const color = u.eco >= 70 ? '#7fa864' : u.eco >= 50 ? '#c8a840' : '#c04030';
+      const r     = u.isUser ? 9 : 5;
+      const icon  = L.divIcon({
+        html: `<div class="map-pin${u.isUser ? ' map-pin-me' : ''}" style="background:${color};width:${r*2}px;height:${r*2}px;border-radius:50%"></div>`,
+        className: '', iconSize: [r * 2, r * 2], iconAnchor: [r, r],
+      });
+      L.marker([u.lat, u.lng], { icon })
+        .addTo(worldMap)
+        .bindPopup(
+          `<b>${u.isUser ? '📍 Vous' : '🌍 ' + u.city}</b><br>Score éco : ${u.eco}/100`,
+          { closeButton: false, className: 'eco-popup' }
+        );
+    });
+  } catch (e) { console.warn('[worldmap]', e.message); }
+}
+
+/* ─── 4. MODE MILITANT ───────────────────────────────────────────── */
+function toggleMilitant() {
+  const active = document.body.classList.toggle('militant');
+  localStorage.setItem('eco_militant', active ? '1' : '');
+  const btn = $id('militant-btn');
+  btn.classList.toggle('militant-active', active);
+  btn.title = active
+    ? 'Mode Militant ON — cliquer pour désactiver'
+    : 'Réduire l\'impact de la page de 97%';
+
+  const banner = $id('militant-banner');
+  banner.hidden = !active;
+  if (active) {
+    clearTimeout(banner._timer);
+    banner._timer = setTimeout(() => { banner.hidden = true; }, 6000);
+  }
+}
+
+function initMilitant() {
+  if (localStorage.getItem('eco_militant') === '1') {
+    document.body.classList.add('militant');
+    $id('militant-btn')?.classList.add('militant-active');
+  }
+}
+
+/* ─── SUPPRIMÉ — remplacé par les features ci-dessus ─────────────── */
+/* updateImpactSlider, renderMonthlyChart, IMPACT_PERIODS */
+
+/* ─── PLACEHOLDER pour éviter erreur si ancien HTML référence ces fn */
 const IMPACT_PERIODS = [
   { label: '30 jours', days: 30 },
   { label: '6 mois',   days: 180 },
@@ -638,6 +810,7 @@ function labelPriority(p) {
 /* ─── Init ───────────────────────────────────────────────────────── */
 (function init() {
   initTheme();
+  initMilitant();
 
   // Entrée clavier sur les champs auth
   ['login-email','login-password'].forEach(id => {

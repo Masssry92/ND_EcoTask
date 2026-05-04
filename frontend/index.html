@@ -11,6 +11,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <!-- Leaflet.js — carte mondiale participants (40 Ko, justifié Green IT) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
 
@@ -96,6 +98,8 @@
       </div>
       <button class="btn-icon" id="theme-toggle" title="Basculer mode sombre"
               onclick="toggleDark()" aria-label="Basculer mode sombre">◑</button>
+      <button class="btn-militant" id="militant-btn" onclick="toggleMilitant()"
+              title="Réduire l'impact de la page de 97%">⚡ Militant</button>
       <button class="btn-ghost" onclick="handleLogout()">Déconnexion</button>
     </div>
   </nav>
@@ -151,12 +155,19 @@
         </div>
         <div class="dash-panels">
           <div class="dash-panel">
-            <div class="dash-panel-title">💡 Suggestions</div>
-            <div id="suggestions-list" class="suggestions-list"></div>
+            <div class="dash-panel-title">⚡ DÉFIS DU JOUR</div>
+            <div id="challenges-list"></div>
+            <div class="challenges-score" id="challenges-score"></div>
           </div>
           <div class="dash-panel">
             <div class="dash-panel-title">📊 Par catégorie</div>
             <div id="categories-chart"></div>
+          </div>
+          <div class="dash-panel dash-panel--lb">
+            <div class="dash-panel-title">🏆 CLASSEMENT HEBDO</div>
+            <div class="lb-week-label" id="leaderboard-week"></div>
+            <div id="leaderboard-list"></div>
+            <div class="lb-meta" id="leaderboard-meta"></div>
           </div>
           <div class="dash-panel dash-panel--impact">
             <div class="dash-panel-title">🌍 Impact planétaire</div>
@@ -174,10 +185,16 @@
           </div>
         </div>
 
-        <!-- Graphe mensuel -->
+        <!-- Carte mondiale -->
         <div class="dash-monthly">
-          <div class="dash-panel-title">📅 Évolution ce mois-ci</div>
-          <div id="monthly-chart" class="monthly-chart"></div>
+          <div class="dash-panel-title">🌍 PARTICIPANTS DANS LE MONDE</div>
+          <div id="world-map"></div>
+          <div class="world-map-legend">
+            <span><span class="legend-dot" style="background:#7fa864"></span> Score ≥ 70</span>
+            <span><span class="legend-dot" style="background:#c8a840"></span> Score 50–70</span>
+            <span><span class="legend-dot" style="background:#c04030"></span> Score &lt; 50</span>
+            <span class="world-map-count">🌍 24 éco-guerriers actifs</span>
+          </div>
         </div>
 
       </div>
@@ -283,6 +300,15 @@
   </div>
 </div>
 
+<!-- Bannière mode militant -->
+<div class="militant-banner" id="militant-banner" hidden>
+  <strong>⚡ MODE MILITANT ACTIVÉ</strong>
+  <div>Impact réduit de ~97% · 0,028g CO₂ économisé</div>
+  <div>= 1,4 km en voiture évités</div>
+  <div class="militant-badge">🏆 Badge débloqué : Éco-Warrior</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 <script src="app.js" defer></script>
 </body>
 </html>
