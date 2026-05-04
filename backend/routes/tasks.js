@@ -3,13 +3,25 @@
 // Green IT : pagination LIMIT/OFFSET, SELECT ciblé, index BDD, < 5 requêtes / vue
 
 const router = require('express').Router();
-const { getDB } = require('../db');
+const { getDB, getDashboardData } = require('../db');
 const { requireAuth } = require('./auth');
 
 /* ─── Constantes ──────────────────────────────────────────────── */
-const PAGE_SIZE   = 20; // pagination : 20 tâches max par page
+const PAGE_SIZE        = 20;
 const VALID_STATUSES   = ['todo', 'in_progress', 'done'];
 const VALID_PRIORITIES = ['low', 'medium', 'high'];
+
+const ECO_CATS = { transport: 20, alimentation: 18, energie: 18, recyclage: 22, numerique: 12 };
+
+const POSITIVE_KW = [
+  'vélo','velo','marche','piéton','pieton','covoiturage','bus','métro','metro','train',
+  'bio','local','végétarien','vegetarien','végétal','vegetal','vegan',
+  'solaire','éolien','eolien','renouvelable','économis','economis','isoler','isolation',
+  'tri','compost','réutilis','reutilis','répar','repar','upcycl',
+  'optimis','réduire','reduire','alléger','alleger','sobriété','sobriete',
+  'zéro déchet','zero dechet','durable','écolog','ecolog','vert',
+];
+const NEGATIVE_KW = ['voiture','avion','vol ','fast-food','jetable','plastique'];
 
 /* ─── Validation ──────────────────────────────────────────────── */
 function validateTask({ title, status, priority, category }) {
@@ -21,13 +33,22 @@ function validateTask({ title, status, priority, category }) {
   return null;
 }
 
-/** Calcule un score éco simple (0-100) basé sur le contenu de la tâche */
-function computeEcoScore({ description, category }) {
-  let score = 50;
-  if (!description || description.length < 20) score += 10; // sobriété du contenu
-  if (category && category.toLowerCase().includes('eco')) score += 20;
-  if (category && category.toLowerCase().includes('env')) score += 15;
-  return Math.min(score, 100);
+/** Score éco intelligent (0–100) : catégorie + mots-clés titre/description */
+function computeEcoScore({ title, description, category }) {
+  let score = 40;
+
+  const cat = (category || '').toLowerCase().trim();
+  if (ECO_CATS[cat]) score += ECO_CATS[cat];
+
+  const text = `${title || ''} ${description || ''}`.toLowerCase();
+  const pos  = POSITIVE_KW.filter(kw => text.includes(kw)).length;
+  const neg  = NEGATIVE_KW.filter(kw => text.includes(kw)).length;
+
+  score += Math.min(pos * 7, 28);
+  score -= neg * 15;
+  if (!description || description.length < 30) score += 5;
+
+  return Math.max(10, Math.min(score, 100));
 }
 
 /* ─── GET /api/tasks ──────────────────────────────────────────── */
@@ -99,6 +120,13 @@ router.get('/stats/me', requireAuth, (req, res) => {
   res.json({ data: stats });
 });
 
+/* ─── GET /api/tasks/dashboard/me ────────────────────────────── */
+// Agrégations riches pour le tableau de bord éco
+router.get('/dashboard/me', requireAuth, (req, res) => {
+  const data = getDashboardData(req.user.id);
+  res.json({ data });
+});
+
 /* ─── GET /api/tasks/:id ──────────────────────────────────────── */
 router.get('/:id', requireAuth, (req, res) => {
   const db   = getDB();
@@ -121,7 +149,7 @@ router.post('/', requireAuth, (req, res) => {
   if (err) return res.status(400).json({ error: err });
 
   const db        = getDB();
-  const eco_score = computeEcoScore({ description, category });
+  const eco_score = computeEcoScore({ title, description, category });
 
   const { lastInsertRowid } = db.prepare(`
     INSERT INTO tasks (user_id, title, description, status, priority, category, due_date, eco_score)
@@ -177,10 +205,11 @@ router.patch('/:id', requireAuth, (req, res) => {
   });
   if (err && req.body.title !== undefined) return res.status(400).json({ error: err });
 
-  // Recalculer eco_score si description ou category changent
-  if (req.body.description !== undefined || req.body.category !== undefined) {
-    const current = db.prepare('SELECT description, category FROM tasks WHERE id = ?').get(task.id);
+  // Recalculer eco_score si title, description ou category changent
+  if (req.body.title !== undefined || req.body.description !== undefined || req.body.category !== undefined) {
+    const current = db.prepare('SELECT title, description, category FROM tasks WHERE id = ?').get(task.id);
     const eco_score = computeEcoScore({
+      title:       req.body.title       ?? current.title,
       description: req.body.description ?? current.description,
       category:    req.body.category    ?? current.category,
     });

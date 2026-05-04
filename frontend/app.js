@@ -12,8 +12,9 @@ const state = {
   token:       null,
   user:        null,
   currentPage: 1,
-  editingId:   null,   // null = création, number = édition
+  editingId:   null,
   deletingId:  null,
+  dashData:    null,   // données dashboard pour le slider planète
 };
 
 /* ─── Utils ─────────────────────────────────────────────────────── */
@@ -165,41 +166,239 @@ function handleLogout() {
 function enterApp() {
   $id('nav-greeting').textContent = `Bonjour, ${state.user.name} 👋`;
   showScreen('app');
-  loadStats();
+  loadDashboard();
   loadTasks(1);
 }
 
-/* ─── Stats éco ──────────────────────────────────────────────────── */
-async function loadStats() {
+/* ─── Dashboard éco ──────────────────────────────────────────────── */
+async function loadDashboard() {
   try {
-    const data = await api('GET', '/tasks/stats/me');
-    if (!data) return;
-    const { total, done, todo, avg_eco_score } = data.data;
+    const res = await api('GET', '/tasks/dashboard/me');
+    if (!res) return;
+    const d = res.data;
 
+    // Stats bar rapides
     $id('stats-bar').innerHTML = `
-      <div class="stat-chip">
-        <strong>${total ?? 0}</strong>
-        Total
-      </div>
-      <div class="stat-chip">
-        <strong>${done ?? 0}</strong>
-        Terminées
-      </div>
-      <div class="stat-chip">
-        <strong>${todo ?? 0}</strong>
-        À faire
-      </div>
-      <div class="stat-chip eco">
-        <strong>${avg_eco_score ? Math.round(avg_eco_score) : '—'}</strong>
-        Score éco moy.
-      </div>
+      <div class="stat-chip"><strong>${d.total ?? 0}</strong>Total</div>
+      <div class="stat-chip"><strong>${d.done ?? 0}</strong>Terminées</div>
+      <div class="stat-chip"><strong>${d.todo ?? 0}</strong>À faire</div>
+      <div class="stat-chip eco"><strong>${d.avgEco || '—'}</strong>Score éco moy.</div>
     `;
 
-    // Pill dans la nav
-    $id('eco-score-val').textContent = avg_eco_score
-      ? Math.round(avg_eco_score) + '/100'
-      : '—';
+    // Pill nav
+    $id('eco-score-val').textContent = d.avgEco ? d.avgEco + '/100' : '—';
+
+    // Anneau éco
+    const ring = $id('dash-ring');
+    ring.style.setProperty('--eco-pct', d.avgEco || 0);
+    animateCounter('dash-score-num', d.avgEco || 0);
+    $id('dash-total').textContent = d.total;
+    $id('dash-done').textContent  = d.done;
+
+    // Suggestions
+    const sEl = $id('suggestions-list');
+    sEl.innerHTML = (d.suggestions || []).map(s =>
+      `<div class="suggestion"><span class="sug-icon">${s.icon}</span><span>${s.text}</span></div>`
+    ).join('') || '<p class="empty-state" style="font-size:.75rem">Ajoutez des tâches.</p>';
+
+    // Graphique catégories
+    const cEl = $id('categories-chart');
+    if (d.byCategory && d.byCategory.length) {
+      const max = Math.max(...d.byCategory.map(c => c.count));
+      cEl.innerHTML = d.byCategory.map(c => `
+        <div class="cat-bar-row">
+          <span class="cat-bar-label">${catLabel(c.category)}</span>
+          <div class="cat-bar-track">
+            <div class="cat-bar-fill" style="--bar-pct:${Math.round(c.count / max * 100)}%">
+              <span class="cat-bar-val">${c.count}</span>
+            </div>
+          </div>
+          <span class="eco-badge ${c.avgScore >= 70 ? 'eco-good' : c.avgScore >= 50 ? 'eco-ok' : 'eco-low'}">${c.avgScore}</span>
+        </div>
+      `).join('');
+    } else {
+      cEl.innerHTML = '<p class="empty-state" style="font-size:.75rem">Aucune donnée.</p>';
+    }
+
+    // Stocker pour le slider
+    state.dashData = d;
+
+    // Slider planète + graphe mensuel
+    updateImpactSlider(Number($id('impact-slider').value) || 0);
+    renderMonthlyChart(d.monthlyActivity || []);
   } catch (e) { /* silencieux — non bloquant */ }
+}
+
+/* ─── Slider planète interactif ──────────────────────────────────── */
+const IMPACT_PERIODS = [
+  { label: '30 jours', days: 30 },
+  { label: '6 mois',   days: 180 },
+  { label: '1 an',     days: 365 },
+  { label: '5 ans',    days: 1825 },
+  { label: '10 ans',   days: 3650 },
+  { label: '30 ans',   days: 10950 },
+];
+
+function updateImpactSlider(idx) {
+  const d = state.dashData;
+  if (!d) return;
+
+  const planet = $id('impact-planet');
+  const status = $id('impact-status');
+  const nums   = $id('impact-numbers');
+
+  if (!d.total) {
+    planet.textContent = '🌱';
+    planet.className   = 'impact-planet';
+    status.textContent = 'Créez des tâches pour voir votre impact.';
+    status.className   = 'impact-status';
+    nums.innerHTML     = '';
+    return;
+  }
+
+  const weekCount = (d.weeklyActivity || []).reduce((s, w) => s + w.count, 0);
+  const dailyRate = Math.max(weekCount ? weekCount / 7 : d.total / 30, 0.05);
+  const period    = IMPACT_PERIODS[idx];
+  const tasks     = Math.max(1, Math.round(dailyRate * period.days));
+  const avg       = d.avgEco || 50;
+
+  // Impact net : score > 50 = bon, < 50 = mauvais (50 = neutre)
+  const co2Net  = Math.round(tasks * (avg - 50) * 0.12);
+  const co2Abs  = Math.abs(co2Net);
+  const trees   = Math.round(co2Abs / 22);
+  const good    = co2Net >= 0;
+
+  // Planète — état et animation
+  planet.textContent = '🌍';
+  const intensity = Math.min(co2Abs / 200, 1); // 0→1 selon intensité
+  planet.className = 'impact-planet ' + (good ? 'planet-good' : 'planet-bad') +
+    (intensity > 0.7 ? ' planet-intense' : '');
+
+  // Message selon état + période
+  if (good) {
+    const msgs = ['Impact positif, continuez ! ✨', 'Vous êtes sur la bonne voie 🌱',
+                  'La planète vous remercie ! 💚', 'Vous êtes un héros vert ! 🏆'];
+    status.textContent = msgs[Math.min(Math.floor(intensity * 4), 3)];
+    status.className   = 'impact-status status-good';
+  } else {
+    const msgs = ['Légèrement négatif 😕', 'Impact négatif, changez vos habitudes 😟',
+                  'La planète souffre ! ⚠️', 'Urgence climatique ! 🔥'];
+    status.textContent = msgs[Math.min(Math.floor(intensity * 4), 3)];
+    status.className   = 'impact-status status-bad';
+  }
+
+  // Chiffres
+  nums.innerHTML = `
+    <div class="impact-period">${period.label}</div>
+    <div class="impact-row">≈ <strong>${tasks}</strong> action${tasks > 1 ? 's' : ''} éco</div>
+    <div class="impact-row ${good ? 'impact-good' : 'impact-bad'}">
+      ${good ? '✅' : '⚠️'} ${good ? '+' : '−'}${co2Abs} kg CO₂ ${good ? 'économisés' : 'émis'}
+    </div>
+    <div class="impact-row">
+      🌳 ${trees} arbre${trees !== 1 ? 's' : ''} ${good ? 'préservé' : 'perdu'}${trees !== 1 ? 's' : ''}
+    </div>
+  `;
+}
+
+/* ─── Graphe mensuel ─────────────────────────────────────────────── */
+function renderMonthlyChart(monthlyActivity) {
+  const el = $id('monthly-chart');
+  const hasData = monthlyActivity.some(d => d.count > 0);
+
+  if (!hasData) {
+    el.innerHTML = '<p class="empty-state" style="font-size:.73rem;padding:.5rem 0">Aucune activité ce mois-ci — créez votre première tâche !</p>';
+    return;
+  }
+
+  const maxCount = Math.max(...monthlyActivity.map(d => d.count), 1);
+  const todayDay = new Date().getDate();
+
+  el.innerHTML = `<div class="monthly-bars">` +
+    monthlyActivity.map(d => {
+      const hPct = d.count ? Math.max(d.count / maxCount * 100, 8) : 0;
+      const color = d.avgScore >= 70 ? 'var(--leaf)' :
+                    d.avgScore >= 50 ? 'var(--accent)' : 'var(--red)';
+      return `
+        <div class="monthly-bar-col" title="${d.date} : ${d.count} tâche${d.count > 1 ? 's' : ''}${d.avgScore ? ', score ' + d.avgScore : ''}">
+          <div class="monthly-bar-wrap">
+            <div class="monthly-bar" style="--h:${hPct}%; --color:${color}"></div>
+          </div>
+          <div class="monthly-bar-day${d.day === todayDay ? ' today' : ''}">${d.day}</div>
+        </div>
+      `;
+    }).join('') +
+  `</div>`;
+}
+
+function animateCounter(elId, target) {
+  const el = $id(elId);
+  const start = performance.now();
+  const duration = 900;
+  function step(now) {
+    const pct  = Math.min((now - start) / duration, 1);
+    const ease = 1 - Math.pow(1 - pct, 3);
+    el.textContent = Math.round(target * ease);
+    if (pct < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function toggleDashboard() {
+  const body = $id('dash-body');
+  const btn  = $id('dash-toggle');
+  const collapsed = body.classList.toggle('collapsed');
+  btn.textContent = collapsed ? 'Afficher ▼' : 'Réduire ▲';
+}
+
+function catLabel(cat) {
+  return { transport: '🚗 Transport', alimentation: '🥗 Alim.', energie: '⚡ Énergie',
+           recyclage: '♻️ Recyclage', numerique: '💻 Num.', general: '📋 Général' }[cat] || cat;
+}
+
+/* ─── Catégories rapides (modal) ─────────────────────────────────── */
+function selectCat(cat) {
+  $id('task-category').value = cat;
+  syncCatPills();
+  updateEcoPreview();
+}
+
+function syncCatPills() {
+  const val = $id('task-category').value.trim().toLowerCase();
+  document.querySelectorAll('.cat-pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.cat === val);
+  });
+}
+
+/* ─── Aperçu score éco en temps réel ────────────────────────────── */
+const ECO_CATS_CLI  = { transport: 20, alimentation: 18, energie: 18, recyclage: 22, numerique: 12 };
+const POS_KW_CLI    = ['vélo','velo','marche','bio','local','végétarien','vegetarien','solaire',
+                        'éolien','eolien','renouvelable','économis','economis','tri','compost',
+                        'réutilis','reutilis','répar','repar','optimis','réduire','reduire',
+                        'durable','vert','écolog','ecolog'];
+const NEG_KW_CLI    = ['voiture','avion','fast-food','jetable','plastique'];
+
+function computeClientEcoScore(title, desc, cat) {
+  let score = 40;
+  const c = (cat || '').toLowerCase().trim();
+  if (ECO_CATS_CLI[c]) score += ECO_CATS_CLI[c];
+  const text = `${title} ${desc}`.toLowerCase();
+  score += Math.min(POS_KW_CLI.filter(kw => text.includes(kw)).length * 7, 28);
+  score -= NEG_KW_CLI.filter(kw => text.includes(kw)).length * 15;
+  if (!desc || desc.length < 30) score += 5;
+  return Math.max(10, Math.min(score, 100));
+}
+
+function updateEcoPreview() {
+  const title = $id('task-title').value;
+  const desc  = $id('task-desc').value;
+  const cat   = $id('task-category').value;
+  const prev  = $id('eco-preview');
+  if (!title.trim()) { prev.hidden = true; return; }
+  const score = computeClientEcoScore(title, desc, cat);
+  const cls   = score >= 70 ? 'score-good' : score >= 50 ? 'score-ok' : 'score-low';
+  $id('eco-preview-val').textContent = score + '/100';
+  $id('eco-preview-val').className   = cls;
+  prev.hidden = false;
 }
 
 /* ─── Chargement des tâches ──────────────────────────────────────── */
@@ -324,6 +523,8 @@ async function openModal(mode, taskId = null) {
   $id('task-status').value   = 'todo';
   $id('task-priority').value = 'medium';
   $id('task-due').value      = '';
+  document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+  $id('eco-preview').hidden  = true;
 
   if (mode === 'edit' && taskId) {
     try {
@@ -336,6 +537,8 @@ async function openModal(mode, taskId = null) {
       $id('task-priority').value = t.priority;
       $id('task-category').value = t.category !== 'general' ? t.category : '';
       $id('task-due').value      = t.due_date || '';
+      syncCatPills();
+      updateEcoPreview();
     } catch (e) {
       showError('task-error', e.message);
     }
@@ -371,7 +574,7 @@ async function submitTask() {
     }
     closeModal();
     loadTasks(state.currentPage);
-    loadStats();
+    loadDashboard();
   } catch (e) {
     showError('task-error', e.message);
   }
@@ -383,7 +586,7 @@ async function toggleStatus(taskId, currentStatus) {
   try {
     await api('PATCH', `/tasks/${taskId}`, { status: next });
     loadTasks(state.currentPage);
-    loadStats();
+    loadDashboard();
   } catch (e) { /* silencieux */ }
 }
 
@@ -397,7 +600,7 @@ function openConfirm(taskId) {
       await api('DELETE', `/tasks/${state.deletingId}`);
       closeConfirm();
       loadTasks(state.currentPage);
-      loadStats();
+      loadDashboard();
     } catch (e) { /* silencieux */ }
   };
 }

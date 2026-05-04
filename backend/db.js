@@ -229,4 +229,106 @@ function applySetClause(target, sql, params) {
   fields.forEach((f, idx) => { target[f] = params[idx]; });
 }
 
-module.exports = { initDB, getDB };
+/* ─── Dashboard agrégé (lecture directe JSON, pas de SQL adapter) ── */
+function getDashboardData(userId) {
+  const data  = readAll();
+  // Comparaison robuste : coerce les deux côtés en string (évite number vs string)
+  const tasks = data.tasks.filter(t => String(t.user_id) === String(userId));
+
+  const total      = tasks.length;
+  const done       = tasks.filter(t => t.status === 'done').length;
+  const todo       = tasks.filter(t => t.status === 'todo').length;
+  const inProgress = tasks.filter(t => t.status === 'in_progress').length;
+  const totalEco   = tasks.reduce((s, t) => s + (Number(t.eco_score) || 0), 0);
+  const avgEco     = total ? Math.round(totalEco / total) : 0;
+
+  // Répartition par catégorie
+  const catMap = {};
+  for (const t of tasks) {
+    const cat = t.category || 'general';
+    if (!catMap[cat]) catMap[cat] = { count: 0, totalScore: 0 };
+    catMap[cat].count++;
+    catMap[cat].totalScore += Number(t.eco_score) || 0;
+  }
+  const byCategory = Object.entries(catMap)
+    .map(([cat, v]) => ({
+      category: cat,
+      count:    v.count,
+      avgScore: Math.round(v.totalScore / v.count),
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+
+  // Activité des 7 derniers jours
+  const weeklyActivity = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr  = d.toISOString().slice(0, 10);
+    const dayTasks = tasks.filter(t => (t.created_at || '').slice(0, 10) === dateStr);
+    weeklyActivity.push({
+      date:     dateStr,
+      count:    dayTasks.length,
+      avgScore: dayTasks.length
+        ? Math.round(dayTasks.reduce((s, t) => s + (Number(t.eco_score) || 0), 0) / dayTasks.length)
+        : null,
+    });
+  }
+
+  // Activité du mois en cours (chaque jour 1 → aujourd'hui)
+  const now2       = new Date();
+  const y          = now2.getFullYear();
+  const m          = now2.getMonth();
+  const todayDay   = now2.getDate();
+  const monthlyActivity = [];
+  for (let day = 1; day <= todayDay; day++) {
+    const dateStr  = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const dayTasks = tasks.filter(t => (t.created_at || '').slice(0, 10) === dateStr);
+    monthlyActivity.push({
+      day,
+      date:     dateStr,
+      count:    dayTasks.length,
+      avgScore: dayTasks.length
+        ? Math.round(dayTasks.reduce((s, t) => s + (Number(t.eco_score) || 0), 0) / dayTasks.length)
+        : 0,
+    });
+  }
+
+  const suggestions = generateSuggestions(tasks, byCategory, avgEco);
+  return { total, done, todo, inProgress, totalEco, avgEco, byCategory, weeklyActivity, monthlyActivity, suggestions };
+}
+
+function generateSuggestions(tasks, byCategory, avgEco) {
+  if (tasks.length === 0) {
+    return [{ icon: '🌱', text: 'Créez votre première tâche éco-responsable pour démarrer votre impact !' }];
+  }
+
+  const suggestions = [];
+
+  if (avgEco >= 75) {
+    suggestions.push({ icon: '🏆', text: 'Excellent score éco ! Partagez vos bonnes pratiques autour de vous.' });
+  } else if (avgEco < 50) {
+    suggestions.push({ icon: '♻️', text: 'Ajoutez des tâches Recyclage ou Énergie pour booster votre score éco.' });
+  }
+
+  if (!byCategory.some(c => c.category === 'transport')) {
+    suggestions.push({ icon: '🚲', text: 'Enregistrez vos trajets éco (vélo, marche) dans la catégorie Transport.' });
+  }
+
+  if (!byCategory.some(c => c.category === 'alimentation') && tasks.length >= 3) {
+    suggestions.push({ icon: '🥗', text: 'Notez vos actions alimentaires (bio, local, végétarien) pour améliorer votre impact.' });
+  }
+
+  const todoRatio = tasks.filter(t => t.status === 'todo').length / tasks.length;
+  if (todoRatio > 0.6 && tasks.length > 3) {
+    suggestions.push({ icon: '✅', text: 'Beaucoup de tâches en attente — terminez-en quelques-unes pour progresser !' });
+  }
+
+  if (tasks.length > 0 && tasks.every(t => t.category === 'general')) {
+    suggestions.push({ icon: '🏷️', text: 'Utilisez les catégories (Transport, Énergie…) pour un meilleur suivi de votre impact.' });
+  }
+
+  return suggestions.slice(0, 3);
+}
+
+module.exports = { initDB, getDB, getDashboardData };

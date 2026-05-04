@@ -126,8 +126,62 @@
       </button>
     </div>
 
-    <!-- Stats éco -->
+    <!-- Stats éco rapides -->
     <div class="stats-bar" id="stats-bar" aria-live="polite"></div>
+
+    <!-- Dashboard éco -->
+    <div class="eco-dashboard" id="eco-dashboard" aria-label="Tableau de bord éco">
+      <div class="dash-header">
+        <span class="dash-title">📊 Tableau de bord éco</span>
+        <button class="btn-ghost btn-sm" id="dash-toggle" onclick="toggleDashboard()">Réduire ▲</button>
+      </div>
+      <div class="dash-body" id="dash-body">
+        <div class="dash-ring-section">
+          <div class="dash-ring" id="dash-ring">
+            <div class="dash-ring-inner">
+              <span class="dash-score-num" id="dash-score-num">0</span>
+              <small>/ 100</small>
+              <small class="dash-score-label">score éco moy.</small>
+            </div>
+          </div>
+          <div class="dash-quick-stats">
+            <div class="dash-stat"><span id="dash-total">—</span><small>tâches</small></div>
+            <div class="dash-stat"><span id="dash-done">—</span><small>terminées</small></div>
+          </div>
+        </div>
+        <div class="dash-panels">
+          <div class="dash-panel">
+            <div class="dash-panel-title">💡 Suggestions</div>
+            <div id="suggestions-list" class="suggestions-list"></div>
+          </div>
+          <div class="dash-panel">
+            <div class="dash-panel-title">📊 Par catégorie</div>
+            <div id="categories-chart"></div>
+          </div>
+          <div class="dash-panel dash-panel--impact">
+            <div class="dash-panel-title">🌍 Impact planétaire</div>
+            <div id="impact-planet" class="impact-planet">🌍</div>
+            <p id="impact-status" class="impact-status">—</p>
+            <div id="impact-numbers" class="impact-numbers"></div>
+            <input type="range" id="impact-slider" class="impact-slider"
+                   min="0" max="5" step="1" value="0"
+                   oninput="updateImpactSlider(+this.value)"
+                   aria-label="Période de projection">
+            <div class="impact-ticks" aria-hidden="true">
+              <span>30j</span><span>6mo</span><span>1an</span>
+              <span>5ans</span><span>10ans</span><span>30ans</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Graphe mensuel -->
+        <div class="dash-monthly">
+          <div class="dash-panel-title">📅 Évolution ce mois-ci</div>
+          <div id="monthly-chart" class="monthly-chart"></div>
+        </div>
+
+      </div>
+    </div>
 
     <!-- Liste des tâches -->
     <section aria-label="Liste des tâches">
@@ -154,12 +208,14 @@
     <div class="field">
       <label for="task-title">Titre <span aria-hidden="true">*</span></label>
       <input type="text" id="task-title" maxlength="120"
-             placeholder="Ex. : Optimiser les images du site" required>
+             placeholder="Ex. : Aller au travail à vélo"
+             oninput="updateEcoPreview()" required>
     </div>
     <div class="field">
       <label for="task-desc">Description</label>
       <textarea id="task-desc" rows="3"
-                placeholder="Détails optionnels…"></textarea>
+                placeholder="Détails optionnels…"
+                oninput="updateEcoPreview()"></textarea>
     </div>
     <div class="field-row">
       <div class="field">
@@ -182,13 +238,25 @@
     <div class="field-row">
       <div class="field">
         <label for="task-category">Catégorie</label>
+        <div class="cat-pills" id="cat-pills">
+          <button type="button" class="cat-pill" data-cat="transport"    onclick="selectCat('transport')">🚗 Transport</button>
+          <button type="button" class="cat-pill" data-cat="alimentation" onclick="selectCat('alimentation')">🥗 Alim.</button>
+          <button type="button" class="cat-pill" data-cat="energie"      onclick="selectCat('energie')">⚡ Énergie</button>
+          <button type="button" class="cat-pill" data-cat="recyclage"    onclick="selectCat('recyclage')">♻️ Recyclage</button>
+          <button type="button" class="cat-pill" data-cat="numerique"    onclick="selectCat('numerique')">💻 Numérique</button>
+        </div>
         <input type="text" id="task-category" maxlength="50"
-               placeholder="ex : dev, eco, perso">
+               placeholder="ou saisir librement…"
+               oninput="syncCatPills(); updateEcoPreview()">
       </div>
       <div class="field">
         <label for="task-due">Échéance</label>
         <input type="date" id="task-due">
       </div>
+    </div>
+
+    <div class="eco-preview" id="eco-preview" hidden>
+      Score éco estimé : <strong id="eco-preview-val">—</strong>
     </div>
 
     <p class="form-error" id="task-error" role="alert" hidden></p>
