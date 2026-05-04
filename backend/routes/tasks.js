@@ -123,8 +123,13 @@ router.get('/stats/me', requireAuth, (req, res) => {
 /* ─── GET /api/tasks/dashboard/me ────────────────────────────── */
 // Agrégations riches pour le tableau de bord éco
 router.get('/dashboard/me', requireAuth, (req, res) => {
-  const data = getDashboardData(req.user.id);
-  res.json({ data });
+  try {
+    const data = getDashboardData(req.user.id);
+    res.json({ data });
+  } catch (e) {
+    console.error('[dashboard/me]', e.message);
+    res.status(500).json({ error: 'Erreur calcul dashboard' });
+  }
 });
 
 /* ─── GET /api/tasks/:id ──────────────────────────────────────── */

@@ -226,7 +226,7 @@ async function loadDashboard() {
     // Slider planète + graphe mensuel
     updateImpactSlider(Number($id('impact-slider').value) || 0);
     renderMonthlyChart(d.monthlyActivity || []);
-  } catch (e) { /* silencieux — non bloquant */ }
+  } catch (e) { console.warn('[dashboard]', e.message); }
 }
 
 /* ─── Slider planète interactif ──────────────────────────────────── */

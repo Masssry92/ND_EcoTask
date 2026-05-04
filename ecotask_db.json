@@ -19,7 +19,7 @@
       "priority": "medium",
       "category": "transport",
       "due_date": "0006-08-10",
-      "eco_score": 60,
+      "eco_score": 72,
       "created_at": "2026-05-04T18:33:57.550Z",
       "updated_at": "2026-05-04T18:33:57.550Z"
     },
@@ -32,9 +32,9 @@
       "priority": "high",
       "category": "alimentation",
       "due_date": "2026-06-05",
-      "eco_score": 60,
+      "eco_score": 63,
       "created_at": "2026-05-04T18:34:41.746Z",
-      "updated_at": "2026-05-04T18:47:32.695Z"
+      "updated_at": "2026-05-04T18:54:04.116Z"
     },
     {
       "id": 1777920481799,
@@ -45,7 +45,7 @@
       "priority": "high",
       "category": "recyclage",
       "due_date": "2026-06-20",
-      "eco_score": 60,
+      "eco_score": 74,
       "created_at": "2026-05-04T18:48:01.526Z",
       "updated_at": "2026-05-04T18:48:01.526Z"
     }
